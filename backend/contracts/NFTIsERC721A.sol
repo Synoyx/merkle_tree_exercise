@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.22;
+pragma solidity 0.8.23;
 
 /* Author : Ben BK */
 
@@ -37,7 +37,7 @@ contract NFTIsERC721A is ERC721A, Ownable {
     * @param _proof The merkle proof
     **/
     function whitelistMint(address _account, uint _quantity, bytes32[] calldata _proof) external payable {
-        //!\ A COMPLETER /!\
+        require(isWhitelisted(_account, _proof), "You can't mint, you're not whitelisted");
         require(amountNFTperWalletWhitelistSale[msg.sender] + _quantity <= MAX_PER_ADDRESS_DURING_WHITELIST_MINT, "You can only mint two NFTs during the Whitelist Sale");
         require(totalSupply() + _quantity <= MAX_SUPPLY, "Max supply exceeded");
         require(msg.value >= PRICE_WHITELIST_MINT * _quantity, "Not enought funds");
@@ -82,9 +82,35 @@ contract NFTIsERC721A is ERC721A, Ownable {
     * @param _account The account checked
     * @param _proof The merkle proof
     *
-    * @return bool return true if the address is whitelisted, false otherwise
+    * @return ret return true if the address is whitelisted, false otherwise
     **/
-    function isWhitelisted(address _account, bytes32[] calldata _proof) internal view returns(bool) {
-        //!\ A COMPLETER /!\
+    function isWhitelisted(address _account, bytes32[] calldata _proof) internal view returns(bool ret) {
+        bytes32 currentHash = keccak256(abi.encodePacked(_account));
+        for (uint i; i < _proof.length; i++) {
+            int8 compareResult = compareAddresses(currentHash, _proof[i]);
+            if (compareResult < 0) {
+                currentHash = keccak256(abi.encodePacked(currentHash, _proof[i]));
+            }
+            if (compareResult >= 0) {
+                currentHash = keccak256(abi.encodePacked(_proof[i], currentHash));
+            }
+        }
+
+        ret = merkleRoot == currentHash;
+    }
+
+    function compareAddresses(bytes32 addr1, bytes32 addr2) internal pure returns (int8) {
+        bytes20 address1 = bytes20(addr1);
+        bytes20 address2 = bytes20(addr2);
+
+        for (uint256 i = 0; i < 20; i++) {
+            if (address1[i] < address2[i]) {
+                return -1; // addr1 est "plus petit" que addr2
+            } else if (address1[i] > address2[i]) {
+                return 1; // addr1 est "plus grand" que addr2
+            }
+        }
+
+        return 0; // Les adresses sont identiques
     }
 }
